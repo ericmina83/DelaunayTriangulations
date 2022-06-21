@@ -28,7 +28,7 @@ namespace DrawHandler
             {
                 //line.gameObject.SetActive(false);
 
-                 Destroy(pair.Value);
+                Destroy(pair.Value);
             }
 
             parents.Clear();
@@ -86,7 +86,7 @@ namespace DrawHandler
             Line lineObj = Instantiate(linePrefab, parent.transform);
 
             lineObj.parent = parent.name;
-            lineObj.setColor = color;
+            lineObj.SetColor(color);
             lineObj.position = position;
 
             return lineObj;

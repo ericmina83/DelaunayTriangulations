@@ -7,18 +7,19 @@ namespace DrawHandler
     public class Line : MonoBehaviour
     {
         private LineRenderer lr;
-
         public string parent;
-        public Material lineMaterial;
-        public Color setColor = Color.white;
         public Vector3 position;
         public float width = 0.1f;
+
+        public void SetColor(Color color)
+        {
+            lr.material.color = color;
+        }
 
         void Awake()
         {
             lr = gameObject.GetComponent<LineRenderer>();
-            lr.material = lineMaterial;
-            lr.material.color = setColor;
+            // lr.material = lineMaterial;
 
             lr.startWidth = width;
             lr.endWidth = width;
