@@ -86,11 +86,9 @@ public class DelaunayTriangulations : MonoBehaviour
             result.AddRange(lPoints);
             result.AddRange(rPoints);
 
-            Vector3 lPoint, rPoint;
+            GetBaseLRLine(lPoints, rPoints, out Vector3 lPoint, out Vector3 rPoint);
 
-            GetBaseLRLine(lPoints, rPoints, out lPoint, out rPoint);
-
-            while (true)
+            for (int i = 0; i < 10; i++)
             {
                 var oldRPoint = rPoint;
                 var oldLPoint = lPoint;
@@ -120,6 +118,10 @@ public class DelaunayTriangulations : MonoBehaviour
                         rPoint = tmpRPoint;
                         break;
                     }
+                    else
+                    {
+                        lineHandler.DrawLine(oldLPoint, tmpRPoint, linesParent, Color.green);
+                    }
                 }
 
                 foreach (var tmpLPoint in lPoints)
@@ -137,6 +139,7 @@ public class DelaunayTriangulations : MonoBehaviour
 
                         if (IsPInCircle(tmpLPoint, oldRPoint, oldLPoint, p))
                         {
+
                             inCircle = true;
                             break;
                         }
@@ -147,25 +150,37 @@ public class DelaunayTriangulations : MonoBehaviour
                         lPoint = tmpLPoint;
                         break;
                     }
+                    else
+                    {
+                        lineHandler.DrawLine(tmpLPoint, oldRPoint, linesParent, Color.green);
+                    }
                 }
 
                 if (lPoint == oldLPoint && rPoint == oldRPoint)
                     break;
+                else if (lPoint == oldLPoint || rPoint == oldRPoint)
+                {
 
-                // if (IsPInCircle(oldLPoint, oldRPoint, lPoint, rPoint))
-                // {
-                //     lPoint = oldLPoint;
-                //     rPoints.Remove(rPoint);
-                // }
-                // else
-                // {
-                //     rPoint = oldRPoint;
-                //     lPoints.Remove(lPoint);
-                // }
-                if (IsPInCircle(oldLPoint, oldRPoint, lPoint, rPoint))
-                    lineHandler.DrawLine(oldLPoint, rPoint, linesParent, Color.red);
+                }
                 else
-                    lineHandler.DrawLine(oldRPoint, lPoint, linesParent, Color.red);
+                {
+                    if (IsPInCircle(oldLPoint, oldRPoint, lPoint, rPoint))
+                    {
+                        lPoint = oldLPoint;
+                    }
+                    else
+                    {
+                        rPoint = oldRPoint;
+                    }
+
+                }
+
+
+                //if (IsPInCircle(oldLPoint, oldRPoint, lPoint, rPoint))
+                //    lineHandler.DrawLine(oldLPoint, rPoint, linesParent, Color.red);
+                //else
+                //    lineHandler.DrawLine(oldRPoint, lPoint, linesParent, Color.red);
+
                 lineHandler.DrawLine(lPoint, rPoint, linesParent, Color.red);
             }
 
@@ -182,22 +197,27 @@ public class DelaunayTriangulations : MonoBehaviour
         lPoint = lPoints.First();
         rPoint = rPoints.First();
 
-        foreach (var tmpRPoint in rPoints)
+        if (lPoint.y < rPoint.y)
         {
-            if (rPoint == tmpRPoint)
-                continue;
+            foreach (var tmpRPoint in rPoints)
+            {
+                if (rPoint == tmpRPoint)
+                    continue;
 
-            if (Vector3.SignedAngle(rPoint - lPoint, tmpRPoint - lPoint, Vector3.forward) < 0)
-                rPoint = tmpRPoint;
+                if (Vector3.SignedAngle(rPoint - lPoint, tmpRPoint - lPoint, Vector3.forward) < 0)
+                    rPoint = tmpRPoint;
+            }
         }
-
-        foreach (var tmpLPoint in lPoints)
+        else
         {
-            if (lPoint == tmpLPoint)
-                continue;
+            foreach (var tmpLPoint in lPoints)
+            {
+                if (lPoint == tmpLPoint)
+                    continue;
 
-            if (Vector3.SignedAngle(lPoint - rPoint, tmpLPoint - rPoint, Vector3.forward) > 0)
-                lPoint = tmpLPoint;
+                if (Vector3.SignedAngle(lPoint - rPoint, tmpLPoint - rPoint, Vector3.forward) > 0)
+                    lPoint = tmpLPoint;
+            }
         }
 
         lineHandler.DrawLine(lPoint, rPoint, linesParent, Color.red);
