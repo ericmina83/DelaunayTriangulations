@@ -72,6 +72,28 @@ namespace DrawHandler
             return this;
         }
 
+        public Line DrawAngle(Vector3 center, Vector3 fromPoint, Vector3 toPoint, float radius)
+        {
+            gameObject.SetActive(true);
+            int segementCount = 40;
+
+            lr.positionCount = segementCount + 1;
+
+            var fromVec = (fromPoint - center).normalized * radius;
+            var toVec = toPoint - center;
+
+            var normal = Vector3.Cross(fromVec, toVec);
+
+            float angleStep = Vector3.SignedAngle(fromVec, toVec, normal) / segementCount;
+
+            for (int i = 0; i <= segementCount; i++)
+            {
+                lr.SetPosition(i, center + Quaternion.AngleAxis(angleStep * i, normal) * fromVec);
+            }
+
+            return this;
+        }
+
         public Line DrawAngle(Vector3 center, float radius, float startAngle, float endAngle)
         {
             gameObject.SetActive(true);

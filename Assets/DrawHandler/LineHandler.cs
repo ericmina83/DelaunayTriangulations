@@ -72,6 +72,11 @@ namespace DrawHandler
 
         #region Draw Angle
 
+        public Line DrawAngle(Vector3 center, Vector3 fromPoint, Vector3 toPoint, float radius, string parent, Color color)
+        {
+            return AddLine(GetParent(parent), color, center).DrawAngle(center, fromPoint, toPoint, radius);
+        }
+
         public Line DrawAngle(Vector3 center, float radius, float startAngle, float endAngle, string parent, Color color)
         {
             return AddLine(GetParent(parent), color, center).DrawAngle(center, radius, startAngle, endAngle);
