@@ -1,4 +1,3 @@
-using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using System.Linq;
@@ -9,6 +8,7 @@ public class DelaunayTriangulations : MonoBehaviour
     public Point point;
     private List<Point> points = new List<Point>();
     private List<Edge> edges = new List<Edge>();
+    private List<Triangle> triangles = new List<Triangle>();
     public DrawHandler.LineHandler lineHandler;
 
     static readonly string linesParent = "EdgeLines";
@@ -32,22 +32,47 @@ public class DelaunayTriangulations : MonoBehaviour
                 Vector3 newPoint = hit.point;
 
                 points.Add(Instantiate(point, newPoint, Quaternion.identity, gameObject.transform));
-                points = (from vertex in points orderby vertex.position.x select vertex).ToList(); //vertices.OrderBy(vertex => vertex.x).ToList();
+                points = (from vertex in points orderby vertex.Position.x select vertex).ToList(); //vertices.OrderBy(vertex => vertex.x).ToList();
 
                 lineHandler.ClearAllLines();
                 edges.Clear();
+                triangles.Clear();
 
                 Divide(0, points.Count() - 1);
+
+
+                List<int> indices = new List<int>();
+
+
+                mesh.Clear();
+
+                if (triangles.Count > 0)
+                {
+                    var vertices = points.Select((point) => point.Position).ToArray();
+                    mesh.vertices = vertices;
+                    foreach (var triangle in triangles)
+                    {
+                        foreach (var point in triangle.points)
+                        {
+                            indices.Add(points.IndexOf(point));
+                        }
+                    }
+                    mesh.triangles = indices.ToArray();
+                    // mesh.colors = points.Select((point) => Color.white).ToArray();
+
+                    // mesh.RecalculateNormals();
+                    // mesh.RecalculateTangents();
+                }
             }
         }
     }
 
-    bool IsPInCircle(Point c1p, Point c2p, Point c3p, Point pp)
+    static public bool IsPInCircle(Point c1p, Point c2p, Point c3p, Point pp)
     {
-        Vector3 c1 = c1p.position;
-        Vector3 c2 = c2p.position;
-        Vector3 c3 = c3p.position;
-        Vector3 p = pp.position;
+        Vector3 c1 = c1p.Position;
+        Vector3 c2 = c2p.Position;
+        Vector3 c3 = c3p.Position;
+        Vector3 p = pp.Position;
         // use elipse to solve, project 3 point to a elipse will get a 3D face
         // if p under the face means in circle, otherwise means out the circle
         c1.z = c1.x * c1.x + c1.y * c1.y;
@@ -64,7 +89,6 @@ public class DelaunayTriangulations : MonoBehaviour
         return Vector3.Dot(normal, p - c2) < 0; // < mean under the c1 c2 c3 face
     }
 
-
     List<Point> Divide(int l, int r)
     {
         List<Point> result = new List<Point>();
@@ -75,7 +99,21 @@ public class DelaunayTriangulations : MonoBehaviour
         {
             if (r > l)
             {
-                edges.Add(new Edge(points[l], points[r], lineHandler.DrawLine(points[l].position, points[r].position, linesParent, Color.red)));
+                edges.Add
+                (
+                    new Edge
+                    (
+                        points[l],
+                        points[r],
+                        lineHandler.DrawLine
+                        (
+                            points[l].Position,
+                            points[r].Position,
+                            linesParent,
+                            Color.red
+                        )
+                    )
+                );
             }
 
             result.AddRange(points.GetRange(l, r - l + 1));
@@ -90,125 +128,80 @@ public class DelaunayTriangulations : MonoBehaviour
             result.AddRange(lPoints);
             result.AddRange(rPoints);
 
-            GetBaseLRLine(lPoints, rPoints, out Point lPoint, out Point rPoint);
-
-            int roundCount = 0;
+            var baseLine = GetBaseLRLine(ref lPoints, ref rPoints);
+            edges.Add(baseLine);
 
             while (true)
             {
-                var oldRPoint = rPoint;
-                var oldLPoint = lPoint;
+                var lPoint = baseLine.FindCandidatePoint(lPoints, false);
+                var rPoint = baseLine.FindCandidatePoint(rPoints, true);
 
-                foreach (var tmpRPoint in rPoints)
-                {
-                    if (tmpRPoint == oldRPoint)
-                        continue;
-                    else if (Vector3.SignedAngle(
-                        oldLPoint.position - oldRPoint.position,
-                        tmpRPoint.position - oldRPoint.position,
-                        Vector3.forward) > 0)
-                        continue;
+                Point thirdPoint = null;
 
-
-                    bool inCircle = false;
-                    foreach (var p in rPoints)
-                    {
-                        if (p == oldRPoint || p == tmpRPoint)
-                            continue;
-
-                        if (IsPInCircle(tmpRPoint, oldRPoint, oldLPoint, p))
-                        {
-                            inCircle = true;
-                            break;
-                        }
-                    }
-
-                    if (!inCircle)
-                    {
-                        rPoint = tmpRPoint;
-                        break;
-                    }
-                }
-
-                foreach (var tmpLPoint in lPoints)
-                {
-                    if (tmpLPoint == oldLPoint)
-                        continue;
-                    else if (Vector3.SignedAngle(
-                        oldRPoint.position - oldLPoint.position,
-                        tmpLPoint.position - oldLPoint.position,
-                        Vector3.forward) < 0)
-                        continue;
-
-                    bool inCircle = false;
-                    foreach (var p in lPoints)
-                    {
-                        if (p == oldLPoint || p == tmpLPoint)
-                            continue;
-
-                        if (IsPInCircle(tmpLPoint, oldRPoint, oldLPoint, p))
-                        {
-
-                            inCircle = true;
-                            break;
-                        }
-                    }
-
-                    if (!inCircle)
-                    {
-                        lPoint = tmpLPoint;
-                        break;
-                    }
-                }
-
-                if (lPoint == oldLPoint && rPoint == oldRPoint)
+                if (lPoint == baseLine.Left && rPoint == baseLine.Right)
                 {
                     break;
                 }
-                else if (lPoint == oldLPoint || rPoint == oldRPoint)
+                else if (lPoint == baseLine.Left || rPoint == baseLine.Right)
                 {
-
-                }
-                else
-                {
-                    if (IsPInCircle(oldLPoint, oldRPoint, lPoint, rPoint))
+                    if (lPoint == baseLine.Left)
                     {
-                        lPoint = oldLPoint;
+                        thirdPoint = rPoint;
                     }
                     else
                     {
-                        rPoint = oldRPoint;
+                        thirdPoint = lPoint;
                     }
                 }
-                var newEdge = new Edge(lPoint, rPoint, lineHandler.DrawLine(lPoint.position, rPoint.position, linesParent, Color.red));
+                else
+                {
+                    if (IsPInCircle(baseLine.Right, baseLine.Left, lPoint, rPoint))
+                    {
+                        lPoint = baseLine.Left;
+                        thirdPoint = rPoint;
+                    }
+                    else
+                    {
+                        rPoint = baseLine.Right;
+                        thirdPoint = lPoint;
+                    }
+                }
+
+                triangles.Add(new Triangle(baseLine.Right, baseLine.Left, thirdPoint));
+                baseLine = new BaseLine(lPoint, rPoint, lineHandler.DrawLine(lPoint.Position, rPoint.Position, linesParent, Color.red));
+
                 foreach (var edge in new List<Edge>(edges))
                 // foreach (var edge in  edges)
                 {
-                    if (newEdge.CheckIntersection(edge))
+                    if (baseLine.CheckIntersection(edge))
                     {
                         // edge.line.SetColor(Color.black);
                         edges.Remove(edge);
+                        foreach (var triangle in edge.triangles)
+                        {
+                            triangles.Remove(triangle);
+                        }
+                        edge.from.edges.Remove(edge);
+                        edge.to.edges.Remove(edge);
+                        edge.triangles.Clear();
                         edge.line.DeleteSelf();
                     }
                 }
 
-                edges.Add(newEdge);
+                edges.Add(baseLine);
             }
-
-            Debug.Log("end in round: " + roundCount);
-
         }
 
         return result;
     }
 
-    void GetBaseLRLine(List<Point> lPoints, List<Point> rPoints, out Point lPoint, out Point rPoint)
+    private BaseLine GetBaseLRLine(ref List<Point> lPoints, ref List<Point> rPoints)
     {
-        lPoints = (from vertex in lPoints orderby vertex.position.y select vertex).ToList();
-        rPoints = (from vertex in rPoints orderby vertex.position.y select vertex).ToList();
+        lPoints = (from vertex in lPoints orderby vertex.Position.y select vertex).ToList();
+        rPoints = (from vertex in rPoints orderby vertex.Position.y select vertex).ToList();
 
-        lPoint = lPoints.First();
-        rPoint = rPoints.First();
+        var lPoint = lPoints.First();
+        var rPoint = rPoints.First();
 
         // if (lPoint.position.y < rPoint.position.y)
         {
@@ -217,7 +210,7 @@ public class DelaunayTriangulations : MonoBehaviour
                 if (rPoint == tmpRPoint)
                     continue;
 
-                if (Vector3.SignedAngle(rPoint.position - lPoint.position, tmpRPoint.position - lPoint.position, Vector3.forward) < 0)
+                if (Vector3.SignedAngle(rPoint.Position - lPoint.Position, tmpRPoint.Position - lPoint.Position, Vector3.forward) < 0)
                     rPoint = tmpRPoint;
             }
         }
@@ -228,11 +221,11 @@ public class DelaunayTriangulations : MonoBehaviour
                 if (lPoint == tmpLPoint)
                     continue;
 
-                if (Vector3.SignedAngle(lPoint.position - rPoint.position, tmpLPoint.position - rPoint.position, Vector3.forward) > 0)
+                if (Vector3.SignedAngle(lPoint.Position - rPoint.Position, tmpLPoint.Position - rPoint.Position, Vector3.forward) > 0)
                     lPoint = tmpLPoint;
             }
         }
 
-        edges.Add(new Edge(lPoint, rPoint, lineHandler.DrawLine(lPoint.position, rPoint.position, linesParent, Color.red)));
+        return new BaseLine(lPoint, rPoint, lineHandler.DrawLine(lPoint.Position, rPoint.Position, linesParent, Color.red));
     }
 }

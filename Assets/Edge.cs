@@ -1,8 +1,10 @@
 using UnityEngine;
+using System.Collections.Generic;
 
 
 public class Edge
 {
+    public List<Triangle> triangles = new List<Triangle>();
     public Point from;
     public Point to;
     public DrawHandler.Line line;
@@ -12,6 +14,8 @@ public class Edge
         this.from = from;
         this.to = to;
         this.line = line;
+        this.from.edges.Add(this);
+        this.to.edges.Add(this);
     }
 
     private bool ccw(Vector3 A, Vector3 B, Vector3 C)
@@ -25,9 +29,9 @@ public class Edge
             return false;
         else if (edge.to == from || edge.to == to)
             return false;
-            
+
         return
-            ccw(from.position, to.position, edge.from.position) != ccw(from.position, to.position, edge.to.position) &&
-            ccw(edge.from.position, edge.to.position, from.position) != ccw(edge.from.position, edge.to.position, to.position);
+            ccw(from.Position, to.Position, edge.from.Position) != ccw(from.Position, to.Position, edge.to.Position) &&
+            ccw(edge.from.Position, edge.to.Position, from.Position) != ccw(edge.from.Position, edge.to.Position, to.Position);
     }
 }
