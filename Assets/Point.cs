@@ -1,28 +1,17 @@
 using UnityEngine;
 using System.Collections.Generic;
 
-public class Point : MonoBehaviour
+public class Point
 {
     public List<Edge> edges = new List<Edge>();
     private Material material;
 
-    public Vector3 Position
-    {
-        get
-        {
-            return transform.position;
-        }
-    }
+    private Vector3 position;
+    public Vector3 Position => position;
 
-    void Start()
+    public Point(Vector3 position)
     {
-        material = GetComponent<MeshRenderer>().material;
-    }
-
-    public void SetColor(Color color)
-    {
-        material = GetComponent<MeshRenderer>().material;
-        material.color = color;
+        this.position = position;
     }
 
     public Edge FindEdge(Point target)
@@ -32,7 +21,7 @@ public class Point : MonoBehaviour
 
         foreach (var edge in edges)
         {
-            if (edge.from == target || edge.to == target)
+            if (edge.IsPointOfEdge(target))
                 return edge;
         }
 

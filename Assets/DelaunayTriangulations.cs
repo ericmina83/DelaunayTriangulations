@@ -2,69 +2,91 @@ using System.Collections.Generic;
 using UnityEngine;
 using System.Linq;
 
-public class DelaunayTriangulations : MonoBehaviour
+public class DelaunayTriangulations
 {
-    Mesh mesh;
-    public Point point;
-    private List<Point> points = new List<Point>();
-    private List<Edge> edges = new List<Edge>();
-    private List<Triangle> triangles = new List<Triangle>();
-    public DrawHandler.LineHandler lineHandler;
+    public List<Point> points = new List<Point>();
+    public List<Edge> edges = new List<Edge>();
+    public List<Triangle> triangles = new List<Triangle>();
 
-    static readonly string linesParent = "EdgeLines";
-
-    // Start is called before the first frame update
-    void Start()
+    public static Mesh Triangulate(List<Vector3> positions)
     {
-        mesh = GetComponent<MeshFilter>().mesh = new Mesh();
-        lineHandler = GetComponent<DrawHandler.LineHandler>();
+        var result = new DelaunayTriangulations(positions);
+        return result.Algorithm();
     }
 
-    // Update is called once per frame
-    void Update()
+    public DelaunayTriangulations(List<Vector3> positions)
     {
-        if (Input.GetMouseButtonDown(0))
+        points = positions.Select((position) => new Point(position)).OrderBy((point => point.Position.x)).ToList();
+
+        for (int i = 0; i < points.Count; i++)
         {
-            Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
-            RaycastHit hit;
-            if (Physics.Raycast(ray, out hit))
+            var point1 = points[i];
+
+            for (int j = i + 1; j < points.Count; j++)
             {
-                Vector3 newPoint = hit.point;
+                var point2 = points[j];
+                var edge = new Edge(point1, point2);
+                edges.Add(edge);
+            }
+        }
 
-                points.Add(Instantiate(point, newPoint, Quaternion.identity, gameObject.transform));
-                points = (from vertex in points orderby vertex.Position.x select vertex).ToList(); //vertices.OrderBy(vertex => vertex.x).ToList();
-
-                lineHandler.ClearAllLines();
-                edges.Clear();
-                triangles.Clear();
-
-                Divide(0, points.Count() - 1);
-
-
-                List<int> indices = new List<int>();
-
-
-                mesh.Clear();
-
-                if (triangles.Count > 0)
+        for (int i = 0; i < points.Count; i++)
+        {
+            var point1 = points[i];
+            for (int j = i + 1; j < points.Count; j++)
+            {
+                var point2 = points[j];
+                for (int k = j + 1; k < points.Count; k++)
                 {
-                    var vertices = points.Select((point) => point.Position).ToArray();
-                    mesh.vertices = vertices;
-                    foreach (var triangle in triangles)
-                    {
-                        foreach (var point in triangle.points)
-                        {
-                            indices.Add(points.IndexOf(point));
-                        }
-                    }
-                    mesh.triangles = indices.ToArray();
-                    // mesh.colors = points.Select((point) => Color.white).ToArray();
-
-                    // mesh.RecalculateNormals();
-                    // mesh.RecalculateTangents();
+                    var point3 = points[k];
+                    var triangle = new Triangle(point1, point2, point3);
+                    triangles.Add(triangle);
                 }
             }
         }
+
+        Algorithm();
+    }
+
+    private Triangle FindTriangle(Point p1, Point p2, Point p3)
+    {
+        var triangle = FindEdge(p1, p2)?.FindTriangle(p3);
+        triangle.points[0] = p1;
+        triangle.points[1] = p2;
+        triangle.points[2] = p3;
+        return triangle;
+    }
+
+    private Edge FindEdge(Point p1, Point p2)
+    {
+        return p1.FindEdge(p2);
+    }
+
+    private Mesh Algorithm()
+    {
+        Divide(0, points.Count - 1);
+
+        if (triangles.Count == 0)
+        {
+            return null;
+        }
+
+        var mesh = new Mesh();
+
+        mesh.Clear();
+
+        var vertices = points
+            .Select((point) => point.Position)
+            .ToArray();
+        var indices = triangles
+             .Where(triangle => triangle.enabled == true)
+             .SelectMany(triangle => triangle.points.Select(point => points.IndexOf(point)))
+             .ToArray();
+
+        mesh.vertices = vertices;
+        mesh.triangles = indices.ToArray();
+
+        return mesh;
     }
 
     static public bool IsPInCircle(Point c1p, Point c2p, Point c3p, Point pp)
@@ -89,7 +111,7 @@ public class DelaunayTriangulations : MonoBehaviour
         return Vector3.Dot(normal, p - c2) < 0; // < mean under the c1 c2 c3 face
     }
 
-    List<Point> Divide(int l, int r)
+    private List<Point> Divide(int l, int r)
     {
         List<Point> result = new List<Point>();
 
@@ -99,21 +121,7 @@ public class DelaunayTriangulations : MonoBehaviour
         {
             if (r > l)
             {
-                edges.Add
-                (
-                    new Edge
-                    (
-                        points[l],
-                        points[r],
-                        lineHandler.DrawLine
-                        (
-                            points[l].Position,
-                            points[r].Position,
-                            linesParent,
-                            Color.red
-                        )
-                    )
-                );
+                FindEdge(points[l], points[r]).enabled = true;
             }
 
             result.AddRange(points.GetRange(l, r - l + 1));
@@ -129,7 +137,7 @@ public class DelaunayTriangulations : MonoBehaviour
             result.AddRange(rPoints);
 
             var baseLine = GetBaseLRLine(ref lPoints, ref rPoints);
-            edges.Add(baseLine);
+            baseLine.enabled = true;
 
             while (true)
             {
@@ -138,13 +146,13 @@ public class DelaunayTriangulations : MonoBehaviour
 
                 Point thirdPoint = null;
 
-                if (lPoint == baseLine.Left && rPoint == baseLine.Right)
+                if (lPoint == baseLine.left && rPoint == baseLine.right)
                 {
                     break;
                 }
-                else if (lPoint == baseLine.Left || rPoint == baseLine.Right)
+                else if (lPoint == baseLine.left || rPoint == baseLine.right)
                 {
-                    if (lPoint == baseLine.Left)
+                    if (lPoint == baseLine.left)
                     {
                         thirdPoint = rPoint;
                     }
@@ -155,47 +163,41 @@ public class DelaunayTriangulations : MonoBehaviour
                 }
                 else
                 {
-                    if (IsPInCircle(baseLine.Right, baseLine.Left, lPoint, rPoint))
+                    if (IsPInCircle(baseLine.right, baseLine.left, lPoint, rPoint))
                     {
-                        lPoint = baseLine.Left;
+                        lPoint = baseLine.left;
                         thirdPoint = rPoint;
                     }
                     else
                     {
-                        rPoint = baseLine.Right;
+                        rPoint = baseLine.right;
                         thirdPoint = lPoint;
                     }
                 }
 
-                triangles.Add(new Triangle(baseLine.Right, baseLine.Left, thirdPoint));
-                baseLine = new BaseLine(lPoint, rPoint, lineHandler.DrawLine(lPoint.Position, rPoint.Position, linesParent, Color.red));
+                FindTriangle(baseLine.right, baseLine.left, thirdPoint).enabled = true;
+                baseLine = FindEdge(lPoint, rPoint);
 
-                foreach (var edge in new List<Edge>(edges))
-                // foreach (var edge in  edges)
+                foreach (var edge in edges.Where(edge => edge.enabled == true).ToList())
                 {
                     if (baseLine.CheckIntersection(edge))
                     {
-                        // edge.line.SetColor(Color.black);
-                        edges.Remove(edge);
+                        edge.enabled = false;
                         foreach (var triangle in edge.triangles)
                         {
-                            triangles.Remove(triangle);
+                            triangle.enabled = false;
                         }
-                        edge.from.edges.Remove(edge);
-                        edge.to.edges.Remove(edge);
-                        edge.triangles.Clear();
-                        edge.line.DeleteSelf();
                     }
                 }
 
-                edges.Add(baseLine);
+                baseLine.enabled = true;
             }
         }
 
         return result;
     }
 
-    private BaseLine GetBaseLRLine(ref List<Point> lPoints, ref List<Point> rPoints)
+    private Edge GetBaseLRLine(ref List<Point> lPoints, ref List<Point> rPoints)
     {
         lPoints = (from vertex in lPoints orderby vertex.Position.y select vertex).ToList();
         rPoints = (from vertex in rPoints orderby vertex.Position.y select vertex).ToList();
@@ -226,6 +228,6 @@ public class DelaunayTriangulations : MonoBehaviour
             }
         }
 
-        return new BaseLine(lPoint, rPoint, lineHandler.DrawLine(lPoint.Position, rPoint.Position, linesParent, Color.red));
+        return FindEdge(lPoint, rPoint);
     }
 }
